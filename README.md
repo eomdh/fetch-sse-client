@@ -18,7 +18,7 @@ for await (const ev of connectSSE("/stream", {
 ac.abort(); // 취소
 ```
 
-## 왜 EventSource가 아니라
+## EventSource 대신 fetch를 쓰는 이유
 
 `EventSource`는 **GET 전용 · 요청 바디 불가 · 커스텀 헤더 불가**(그래서 `Authorization`을 못 실음) · 취소가 빈약하다. `fetch` 위에 SSE를 직접 구현하면 **POST 바디 · 헤더 주입 · `AbortController` 취소**를 얻는 대신, 파싱과 재접속을 직접 책임진다.
 
