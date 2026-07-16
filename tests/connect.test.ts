@@ -125,4 +125,33 @@ describe("connectSSE", () => {
     expect(seen).toEqual(["a", "b"]);
     expect(attempt).toBe(2);
   });
+
+  it("서버의 retry: 값을 재접속 지연으로 존중한다", async () => {
+    let attempt = 0;
+    let firstAt = 0;
+    let gap = -1;
+    server.use(
+      http.get("http://x/stream", () => {
+        attempt += 1;
+        if (attempt === 1) {
+          // retry를 30ms로 지정하고 끊음 — 기본값(1000ms)이 아니라 30ms 뒤 재접속해야 함.
+          firstAt = Date.now();
+          return new HttpResponse(sseBody("retry: 30\ndata: a\n\n"), { headers: SSE_HEADERS });
+        }
+        gap = Date.now() - firstAt;
+        return new HttpResponse(sseBody("data: b\n\n"), { headers: SSE_HEADERS });
+      }),
+    );
+
+    const seen: string[] = [];
+    for await (const ev of connectSSE("http://x/stream")) {
+      seen.push(ev.data);
+      if (seen.length === 2) break;
+    }
+
+    expect(seen).toEqual(["a", "b"]);
+    // retry:30을 존중했으면 간격이 기본 1000ms보다 훨씬 짧다.
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThan(500);
+  });
 });

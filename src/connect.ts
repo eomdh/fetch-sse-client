@@ -11,6 +11,8 @@ export interface ConnectSSEOptions extends Omit<RequestInit, "signal"> {
   reconnectDelay?: number;
   /** 이 시간(ms) 동안 바이트가 없으면 abort & 재접속. `0`은 비활성. 기본값 `0`. */
   stallTimeout?: number;
+  /** 지수 백오프 상한(ms). 기본값 `30000`. */
+  maxReconnectDelay?: number;
 }
 
 /** stall 워치독이 스트림에 던지는 에러; `reconnect`가 꺼졌을 때만 호출자에게 노출된다. */
@@ -38,12 +40,17 @@ export async function* connectSSE(
     reconnect = true,
     reconnectDelay = 1000,
     stallTimeout = 0,
+    maxReconnectDelay = 30000,
     headers,
     ...init
   } = options;
 
   // 재접속 사이에 유지 → `Last-Event-ID`로 이어받는다.
   let lastEventId: string | undefined;
+  // 재접속 기준 지연(ms). 서버가 `retry:`를 보내면 그 값으로 갱신된다.
+  let retryMs = reconnectDelay;
+  // 연속 실패 횟수(지수 백오프용). 성과 있는 연결에서 0으로 리셋.
+  let failures = 0;
 
   while (true) {
     if (userSignal?.aborted) return;
@@ -72,9 +79,15 @@ export async function* connectSSE(
       // 기대지 않고 파서가 즉시 풀린다.
       const body = stallTimeout > 0 ? watchStall(res.body, stallTimeout) : res.body;
 
+      let productive = false;
       for await (const ev of parseSSE(body)) {
         if (userSignal?.aborted) return;
         if (ev.id !== undefined) lastEventId = ev.id;
+        if (ev.retry !== undefined) retryMs = ev.retry; // 서버가 재접속 기준 지연을 지정.
+        if (!productive) {
+          productive = true;
+          failures = 0; // 이벤트를 받았다 = 건강한 연결 → 백오프 리셋.
+        }
         yield ev;
         if (userSignal?.aborted) return;
       }
@@ -89,7 +102,10 @@ export async function* connectSSE(
     }
 
     if (userSignal?.aborted || !reconnect) return;
-    await delay(reconnectDelay, userSignal);
+    // 지수 백오프: 기준 지연 × 2^연속실패, 상한 이내.
+    const wait = Math.min(retryMs * 2 ** failures, maxReconnectDelay);
+    failures += 1;
+    await delay(wait, userSignal);
   }
 }
 
