@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# AI tooling exhaust
+.omc/
+.claude/
+.superclaude/
+CLAUDE.md
