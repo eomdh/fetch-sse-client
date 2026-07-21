@@ -52,7 +52,8 @@ ac.abort(); // 취소
 - **EventSource 전체 API 호환 아님** — `readyState`/`addEventListener` 스타일 없음(async-generator 설계로 의도적 대체).
 - **`StallError`는 export 안 함** — `reconnect: false`일 때 던져지지만 `instanceof` 대신 `err.name === "StallError"`로 판별.
 - **최대 재시도 횟수 제한 없음** — abort 전까지 재접속(백오프 상한만 있음).
-- **환경 전제** — WHATWG `fetch`/스트림(Node 18+ · 모던 브라우저). 폴리필 없음. npm 미배포.
+- **환경 전제** — WHATWG `fetch`/스트림(Node 18+ · 모던 브라우저). 폴리필 없음.
+- **npm 미배포** — `github:eomdh/fetch-sse-client#v0.1.1` 로 설치한다. 빌드 산출물 `dist/` 를 커밋해 두어 설치 시 빌드 단계가 없다(pnpm 은 git 의존성의 빌드 스크립트를 기본 차단한다).
 
 ## 개발
 
